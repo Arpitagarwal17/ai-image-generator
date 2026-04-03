@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visionary — AI Image Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #2a2a3a;
+    --accent: #c8a97e;
+    --accent2: #7e9ec8;
+    --text: #e8e4dc;
+    --muted: #6a6a7a;
+    --error: #c87e7e;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 60px 24px 100px;
+  }
+
+  header {
+    margin-bottom: 64px;
+    animation: fadeUp 0.8s ease both;
+  }
+
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(42px, 7vw, 72px);
+    line-height: 1.05;
+    font-weight: 400;
+    color: var(--text);
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .subtitle {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    line-height: 1.8;
+  }
+
+  /* input area */
+  .studio {
+    animation: fadeUp 0.8s 0.15s ease both;
+  }
+
+  .input-label {
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .input-wrap {
+    position: relative;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    transition: border-color 0.3s;
+  }
+
+  .input-wrap:focus-within {
+    border-color: var(--accent);
+  }
+
+  textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-style: italic;
+    line-height: 1.6;
+    padding: 28px 24px 80px;
+    resize: none;
+    min-height: 160px;
+  }
+
+  textarea::placeholder {
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
+  .input-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border);
+  }
+
+  .char-count {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .generate-btn {
+    background: var(--accent);
+    color: #0a0a0f;
+    border: none;
+    padding: 10px 28px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+
+  .generate-btn:hover { opacity: 0.85; }
+  .generate-btn:active { transform: scale(0.98); }
+  .generate-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* suggestions */
+  .suggestions {
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .suggestion-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    width: 100%;
+    margin-bottom: 4px;
+  }
+
+  .chip {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+
+  .chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* result area */
+  .result-area {
+    margin-top: 56px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .result-label {
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .result-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* loading state */
+  .loading-frame {
+    aspect-ratio: 1;
+    max-width: 600px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+  }
+
+  .loader {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .loading-text {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .loading-prompt {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--text);
+    opacity: 0.6;
+    max-width: 300px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  /* image result */
+  .image-frame {
+    position: relative;
+    max-width: 600px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .image-frame img {
+    width: 100%;
+    display: block;
+    animation: fadeIn 0.8s ease both;
+  }
+
+  .image-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 20px 24px;
+    background: linear-gradient(transparent, rgba(10,10,15,0.95));
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .image-frame:hover .image-overlay { opacity: 1; }
+
+  .image-prompt-text {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--text);
+    opacity: 0.8;
+    max-width: 70%;
+    line-height: 1.5;
+  }
+
+  .image-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .img-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .img-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* error */
+  .error-box {
+    border: 1px solid var(--error);
+    padding: 20px 24px;
+    max-width: 600px;
+  }
+
+  .error-title {
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--error);
+    margin-bottom: 8px;
+  }
+
+  .error-msg {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* history */
+  .history {
+    margin-top: 64px;
+    animation: fadeUp 0.6s 0.1s ease both;
+  }
+
+  .history-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .history-item {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+
+  .history-item:hover { border-color: var(--accent); }
+
+  .history-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s;
+  }
+
+  .history-item:hover img { transform: scale(1.05); }
+
+  .history-item .h-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px;
+    background: rgba(10,10,15,0.9);
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 11px;
+    color: var(--text);
+    opacity: 0;
+    transition: opacity 0.2s;
+    line-height: 1.4;
+  }
+
+  .history-item:hover .h-label { opacity: 1; }
+
+  /* divider */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 56px 0;
+  }
+
+  /* animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <p class="eyebrow">AI Image Studio</p>
+    <h1>Turn words into<br><em>visual reality</em></h1>
+    <p class="subtitle">Type anything, get an image</p>
+  </header>
+
+  <div class="studio">
+    <label class="input-label" for="prompt">Your vision</label>
+    <div class="input-wrap">
+      <textarea
+        id="prompt"
+        placeholder="a red fox sitting in a snowy forest at golden hour..."
+        maxlength="400"
+        oninput="updateCount()"
+      ></textarea>
+      <div class="input-footer">
+        <span class="char-count"><span id="count">0</span> / 400</span>
+        <button class="generate-btn" id="genBtn" onclick="generate()">Generate Image</button>
+      </div>
+    </div>
+
+    <div class="suggestions">
+      <span class="suggestion-label">Try these</span>
+      <button class="chip" onclick="setPrompt('a lone astronaut on Mars watching twin sunsets')">astronaut on Mars</button>
+      <button class="chip" onclick="setPrompt('a cyberpunk street market in Tokyo at night, neon rain')">cyberpunk Tokyo</button>
+      <button class="chip" onclick="setPrompt('an ancient library with floating glowing books')">ancient library</button>
+      <button class="chip" onclick="setPrompt('a white cat wearing tiny reading glasses, oil painting')">cat oil painting</button>
+      <button class="chip" onclick="setPrompt('an underwater city with bioluminescent creatures')">underwater city</button>
+    </div>
+  </div>
+
+  <div id="resultArea" class="result-area hidden">
+    <p class="result-label" id="resultLabel">Generating</p>
+
+    <div id="loadingFrame" class="loading-frame hidden">
+      <div class="loader"></div>
+      <p class="loading-text">Painting your vision</p>
+      <p class="loading-prompt" id="loadingPrompt"></p>
+    </div>
+
+    <div id="imageFrame" class="image-frame hidden">
+      <img id="resultImg" src="" alt="Generated image"/>
+      <div class="image-overlay">
+        <p class="image-prompt-text" id="imgPromptText"></p>
+        <div class="image-actions">
+          <a id="downloadBtn" class="img-btn" download="visionary.png">Save</a>
+          <a id="openBtn" class="img-btn" target="_blank">Open</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="errorBox" class="error-box hidden">
+      <p class="error-title">Generation failed</p>
+      <p class="error-msg" id="errorMsg">Something went wrong. Please try again.</p>
+    </div>
+  </div>
+
+  <div id="historySection" class="history hidden">
+    <div class="divider"></div>
+    <p class="result-label">Previous generations</p>
+    <div class="history-grid" id="historyGrid"></div>
+  </div>
+
+</div>
+
+<script>
+  const WEBHOOK = "https://arpit17062000.app.n8n.cloud/webhook/image-gen";
+  const history = [];
+
+  function updateCount() {
+    const p = document.getElementById('prompt');
+    document.getElementById('count').textContent = p.value.length;
+  }
+
+  function setPrompt(text) {
+    document.getElementById('prompt').value = text;
+    updateCount();
+    document.getElementById('prompt').focus();
+  }
+
+  function show(id) { document.getElementById(id).classList.remove('hidden'); }
+  function hide(id) { document.getElementById(id).classList.add('hidden'); }
+
+  async function generate() {
+    const prompt = document.getElementById('prompt').value.trim();
+    if (!prompt) {
+      document.getElementById('prompt').focus();
+      return;
+    }
+
+    const btn = document.getElementById('genBtn');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    show('resultArea');
+    show('loadingFrame');
+    hide('imageFrame');
+    hide('errorBox');
+    document.getElementById('resultLabel').textContent = 'Generating';
+    document.getElementById('loadingPrompt').textContent = '"' + prompt + '"';
+
+    try {
+      const res = await fetch(WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+
+      const data = await res.json();
+      const imageUrl = data[0]?.imageUrl || data?.imageUrl;
+
+      if (!imageUrl) throw new Error('No image URL in response');
+
+      hide('loadingFrame');
+      show('imageFrame');
+      document.getElementById('resultLabel').textContent = 'Your image';
+
+      const img = document.getElementById('resultImg');
+      img.src = imageUrl;
+      document.getElementById('imgPromptText').textContent = prompt;
+      document.getElementById('downloadBtn').href = imageUrl;
+      document.getElementById('openBtn').href = imageUrl;
+
+      addToHistory(imageUrl, prompt);
+
+    } catch (err) {
+      hide('loadingFrame');
+      show('errorBox');
+      document.getElementById('resultLabel').textContent = 'Error';
+      document.getElementById('errorMsg').textContent = err.message || 'Something went wrong. Please try again.';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Generate Image';
+  }
+
+  function addToHistory(url, prompt) {
+    history.unshift({ url, prompt });
+    if (history.length > 8) history.pop();
+
+    show('historySection');
+    const grid = document.getElementById('historyGrid');
+    grid.innerHTML = history.map(item => `
+      <div class="history-item" onclick="viewImage('${item.url}')">
+        <img src="${item.url}" alt="${item.prompt}" loading="lazy"/>
+        <div class="h-label">${item.prompt.slice(0, 60)}${item.prompt.length > 60 ? '...' : ''}</div>
+      </div>
+    `).join('');
+  }
+
+  function viewImage(url) {
+    window.open(url, '_blank');
+  }
+
+  document.getElementById('prompt').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) generate();
+  });
+</script>
+
+<footer style="text-align:center;padding:40px 24px;font-size:11px;letter-spacing:0.2em;color:#6a6a7a;text-transform:uppercase;">
+  Created by <span style="color:#c8a97e;">Arpit Agarwal</span>
+</footer>
+
+</body>
+</html>
